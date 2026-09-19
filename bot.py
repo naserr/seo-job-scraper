@@ -87,71 +87,95 @@ MAX_JOBS_PER_RUN = 20
 MIN_FIT_SCORE    = 35
 MAX_JOB_AGE_DAYS = 7
 
-# ─── کلمات جستجو (سفارشی شده برای پشتیبانی فنی) ─────────────────────────────
+# ─── کلمات جستجو (سفارشی شده برای عناوین هدف) ─────────────────────────────
 JSEARCH_QUERIES = {
     1: [
         "Technical Support Specialist remote", 
-        "Customer Support Advocate remote", 
-        "SaaS Support remote"
+        "SaaS Support remote", 
+        "Application Support Analyst remote"
     ],
     2: [
+        "Customer Support Engineer remote", 
         "Tier 2 Support remote", 
-        "Application Support remote", 
-        "API Support remote"
+        "Tier 1 Support remote"
     ],
     3: [
-        "Integration Support remote", 
-        "Technical Support Engineer remote",
+        "IT Helpdesk remote",
         "Technical Support Yerevan",
         "SaaS Support Yerevan"
     ],
 }
 
 # ─── کلمات ضروری (Whitelist) ────────────────────────────────────────────────
-# حتما باید یکی از این کلمات در متن آگهی باشد تا ربات آن را تایید کند
+# حتما باید حداقل یکی از این کلمات در متن آگهی باشد تا ربات آن را تایید کند
 REQUIRED_KEYWORDS = [
-    "saas", "api", "n8n", "crm", "zendesk", "b2b", "tier 2", "tier ii", 
-    "tier-2", "escalation", "software support", "jira", "helpdesk"
+    "saas", "api", "n8n", "crm", "zendesk", "b2b", "tier 1", "tier 2", 
+    "tier i", "tier ii", "jira", "helpdesk", "freshdesk", "intercom", 
+    "servicenow", "troubleshooting", "bug reporting", "root cause"
 ]
 
 _DEFAULT_SKILLS = [
-    "saas", "api integration", "tier 2", "n8n", "workflow automation",
-    "zendesk", "crm", "b2b", "troubleshooting", "html", "sql", "root cause analysis"
+    "saas troubleshooting", "api integrations", "tier 2", "n8n", "workflow automation",
+    "zendesk", "crm", "pipedrive", "bug reporting", "root cause analysis", "html", "sql"
 ]
 _user_skills_env = os.environ.get("USER_SKILLS", "")
 MY_SKILLS = [s.strip().lower() for s in _user_skills_env.split(",") if s.strip()] if _user_skills_env else _DEFAULT_SKILLS
 
-# ─── کلمات ممنوعه (سفارشی شده برای جلوگیری از آگهی‌های نامرتبط و ویزا) ────────
+# ─── کلمات ممنوعه (لیست سیاه دقیق شما) ────────────────────────────────────────
 BLACKLIST_KEYWORDS = [
-    # محدودیت‌های ویزا و لوکیشن
-    "us residents only", "must reside in us", "must be located in the us",
-    "must be located in us", "us only", "uk residents only", "must reside in uk",
-    "eu only", "must be based in", "security clearance", "us citizen",
+    # وضعیت استخدام و مالیات (ویژه آمریکا)
+    "w-2", "w2", "401(k)", "401k", "health insurance", "dental insurance", 
+    "vision insurance", "medical, dental", "dental, vision",
+    
+    # محدودیت‌های جغرافیایی
+    "united states only", "us only", "must reside in", "us citizen", 
+    "security clearance", "public trust", "must be based in", 
     "green card", "no visa sponsorship",
     
-    # مشاغل غیرمرتبط
-    "director", "manager", "head of", "vice president", "vp", 
-    "software engineer", "internship", "unpaid", "volunteer", 
-    "commission only", "cold calling", "outbound sales", "full stack", 
-    "fullstack", "construction", "hvac", "electrical" # برای جلوگیری از آگهی‌های مشابه SOLV Energy
+    # تخصص‌های غیرمرتبط شبکه و زیرساخت فیزیکی
+    "noc", "msp", "high voltage", "ccna", "hardware", "physical server", 
+    "construction", "hvac", "electrical",
+    
+    # حوزه‌های مالی، بانکی و دولتی آمریکا
+    "accounting", "ach payments", "gaap", "federal contractor", "mortgage",
+    
+    # عناوین شغلی ارشد و مدیریتی (جلوگیری از Overqualified)
+    "manager", "director", "head of", "founder", "growth marketing", "vp", "vice president",
+    "internship", "unpaid", "volunteer", "commission only"
 ]
 
-# ─── کلمات امتیازآور (سفارشی شده) ───────────────────────────────────────────
+# ─── کلمات امتیازآور (جهش آگهی‌های منطبق به صدر لیست) ────────────────────────
 BOOST_KEYWORDS = {
-    "saas": 20,
-    "api": 20,
-    "tier 2": 15,
-    "tier ii": 15,
-    "b2b": 15,
+    # نوع قرارداد بین‌المللی (بسیار مهم برای شما)
+    "independent contractor": 25,
+    "b2b": 25,
+    "1099": 25,
+    "offshore": 20,
+    "remote (worldwide)": 20,
+    "remote (anywhere)": 20,
+    "international benefits": 15,
+    "distributed team": 15,
+    
+    # تخصص‌های فنی و نرم‌افزارها
+    "saas": 15,
+    "api": 15,
     "n8n": 25,
-    "workflow": 15,
-    "integration": 15,
     "zendesk": 15,
     "jira": 10,
-    "troubleshooting": 15,
-    "yerevan": 20,
-    "armenia": 20,
-    "remote-first": 10,
+    "freshdesk": 10,
+    "servicenow": 10,
+    "tier 2": 15,
+    "tier 1": 10,
+    "pipedrive": 10,
+    
+    # ساعات کاری منطبق
+    "us business hours": 10,
+    "est": 5,
+    "cst": 5,
+    "weekend shift": 10,
+    "weekend shifts": 10,
+    "after-hours": 10,
+    "yerevan": 20
 }
 
 _SKILL_PATTERNS   = {s: re.compile(r"\b" + re.escape(s) + r"\b", re.I) for s in MY_SKILLS}
