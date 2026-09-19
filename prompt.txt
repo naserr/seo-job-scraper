@@ -1,6 +1,7 @@
-Write a professional, concise cover letter for the '{title}' position at '{company}'.
-Focus on my technical SEO skills and experience.
+Write a highly professional and concise cover letter for the '{title}' position at '{company}'.
+
+Focus strongly on my experience as a Technical Support Specialist (Tier 2), my expertise in SaaS troubleshooting, API integrations, and workflow automation (especially n8n). Emphasize my ability to resolve complex bugs, replicate issues in sandbox environments, and communicate effectively with engineering teams.
 
 Job link: {url}
 
-Keep it under 250 words, be targeted to the job requirements, and end with a call to action.
+Keep it under 200 words, make it highly tailored to the job requirements, use a confident but empathetic tone, and end with a strong call to action for an interview. Do not use generic placeholders.
