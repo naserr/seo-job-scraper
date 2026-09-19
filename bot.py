@@ -1,33 +1,9 @@
 """
-SEO Job Scraper Bot v5.0 (Customized for Technical/SaaS Support)
+SEO Job Scraper Bot v6.0 (Ultimate B2B & Tech Support Sniper)
 ========================
-منابع رایگان:
-  • Remotive.com
-  • Jobicy.com
-  • Arbeitnow
-  • Adzuna (با API key)
-  • FindWork.dev
-  • Cloudflare Worker
-
-منابع پولی (اختیاری):
-  • JSearch via RapidAPI  — پلن رایگان 200 req/ماه
-
-Cover Letter:
-  • هر آگهی یک دکمه "ChatGPT Cover Letter" داره
-  • کلیک → باز شدن ChatGPT با پرامپت آماده
-
-ذخیره‌سازی اختیاری:
-  • Google Sheets (Batch append)
-
-متغیرهای محیطی (GitHub Secrets):
-  TELEGRAM_BOT_TOKEN   — اجباری
-  TELEGRAM_CHAT_ID     — اجباری
-  RAPIDAPI_KEY         — اختیاری
-  GSHEET_CREDENTIALS   — اختیاری (JSON)
-  GSHEET_ID            — اختیاری
-  CF_WORKER_URL        — اختیاری
-  ADZUNA_APP_ID        — اختیاری
-  ADZUNA_API_KEY       — اختیاری
+این نسخه فقط از JSearch (LinkedIn, Indeed, Glassdoor) استفاده می‌کند.
+تمامی منابع رایگان و اسپم به دلیل کیفیت پایین حذف شده‌اند.
+تمرکز استراتژی بر روی مشاغل ریموت بین‌المللی با قرارداد B2B/1099 است.
 """
 
 import html
@@ -77,32 +53,27 @@ GSHEET_CREDENTIALS = os.environ.get("GSHEET_CREDENTIALS", "")
 GSHEET_ID          = os.environ.get("GSHEET_ID", "")
 GSHEET_SHEET_NAME  = "Jobs"
 
-CF_WORKER_URL    = os.environ.get("CF_WORKER_URL", "")
-ADZUNA_APP_ID    = os.environ.get("ADZUNA_APP_ID", "")
-ADZUNA_API_KEY   = os.environ.get("ADZUNA_API_KEY", "")
-
 SEEN_JOBS_FILE   = SCRIPT_DIR / "seen_jobs.txt"
 MAX_SEEN_JOBS    = 3000
 MAX_JOBS_PER_RUN = 20
 MIN_FIT_SCORE    = 35
 MAX_JOB_AGE_DAYS = 7
 
-# ─── کلمات جستجو (سفارشی شده برای عناوین هدف) ─────────────────────────────
+# ─── کلمات جستجو (سفارشی شده برای پشتیبانی فنی بین‌المللی و B2B) ────────────
 JSEARCH_QUERIES = {
     1: [
-        "Technical Support Specialist remote", 
-        "SaaS Support remote", 
-        "Application Support Analyst remote"
+        "Technical Support Specialist remote contract", 
+        "Customer Support remote B2B", 
+        "SaaS Support remote 1099"
     ],
     2: [
-        "Customer Support Engineer remote", 
-        "Tier 2 Support remote", 
-        "Tier 1 Support remote"
+        "Tier 2 Support remote independent contractor", 
+        "Application Support remote contract", 
+        "API Support remote freelance"
     ],
     3: [
-        "IT Helpdesk remote",
         "Technical Support Yerevan",
-        "SaaS Support Yerevan"
+        "SaaS Support Yerevan contract"
     ],
 }
 
@@ -155,6 +126,7 @@ BOOST_KEYWORDS = {
     "remote (anywhere)": 20,
     "international benefits": 15,
     "distributed team": 15,
+    "contract": 15,
     
     # تخصص‌های فنی و نرم‌افزارها
     "saas": 15,
@@ -261,223 +233,16 @@ def calculate_fit_score(job: dict) -> tuple:
 
     return min(score, 100), matched_skills[:4]
 
-# ── Free Sources ────────────────────────────────────────────────────────────
-
-def fetch_remotive() -> list:
-    endpoints = [
-        "https://remotive.com/api/remote-jobs?category=customer_support&limit=20",
-        "https://remotive.com/api/remote-jobs?search=technical+support&limit=10",
-        "https://remotive.com/api/remote-jobs?search=saas+support&limit=10",
-    ]
-    results = []
-    for url in endpoints:
-        try:
-            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-            resp.raise_for_status()
-            for j in resp.json().get("jobs", []):
-                results.append({
-                    "id":           f"remotive_{j.get('id', '')}",
-                    "title":        j.get("title", ""),
-                    "company":      j.get("company_name", ""),
-                    "description":  j.get("description", ""),
-                    "salary":       j.get("salary", ""),
-                    "remote":       True,
-                    "url":          j.get("url", ""),
-                    "source":       "Remotive",
-                    "source_emoji": "🌐",
-                    "posted_at":    (j.get("publication_date") or "")[:10],
-                    "location":     "Remote",
-                })
-        except Exception as e:
-            log.error(f"Remotive error: {e}")
-        time.sleep(1)
-    log.info(f"Remotive -> {len(results)} jobs")
-    return results
-
-def fetch_jobicy() -> list:
-    endpoints = [
-        "https://jobicy.com/api/v2/remote-jobs?tag=customer-support&count=20",
-        "https://jobicy.com/api/v2/remote-jobs?tag=technical-support&count=15",
-    ]
-    results = []
-    for url in endpoints:
-        try:
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            for j in resp.json().get("jobs", []):
-                lo = j.get("annualSalaryMin")
-                hi = j.get("annualSalaryMax")
-                cur = j.get("annualSalaryCurrency", "USD")
-                sal = f"{cur} {int(lo):,}-{int(hi):,}/yr" if lo and hi else (f"{cur} {int(lo):,}+/yr" if lo else "")
-                results.append({
-                    "id":           f"jobicy_{j.get('id', '')}",
-                    "title":        j.get("jobTitle", ""),
-                    "company":      j.get("companyName", ""),
-                    "description":  j.get("jobDescription", ""),
-                    "salary":       sal,
-                    "remote":       True,
-                    "url":          j.get("url", ""),
-                    "source":       "Jobicy",
-                    "source_emoji": "🟢",
-                    "posted_at":    (j.get("pubDate") or "")[:10],
-                    "location":     "Remote",
-                })
-        except Exception as e:
-            log.error(f"Jobicy error: {e}")
-        time.sleep(1)
-    log.info(f"Jobicy -> {len(results)} jobs")
-    return results
-
-def fetch_arbeitnow() -> list:
-    SUPPORT_TERMS = ["support", "saas", "technical support", "customer advocate", "api"]
-    try:
-        resp = requests.get("https://arbeitnow.com/api/job-board-api", timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        results = []
-        for j in resp.json().get("data", []):
-            if not j.get("remote"):
-                continue
-            title = (j.get("title") or "").lower()
-            desc  = (j.get("description") or "").lower()[:300]
-            if not any(t in title or t in desc for t in SUPPORT_TERMS):
-                continue
-            results.append({
-                "id":           f"arbeitnow_{j.get('slug', '')}",
-                "title":        j.get("title", ""),
-                "company":      j.get("company_name", ""),
-                "description":  j.get("description", ""),
-                "salary":       "",
-                "remote":       True,
-                "url":          j.get("url", ""),
-                "source":       "Arbeitnow",
-                "source_emoji": "🔷",
-                "posted_at":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "location":     "Remote",
-            })
-        log.info(f"Arbeitnow -> {len(results)} jobs")
-        return results
-    except Exception as e:
-        log.error(f"Arbeitnow error: {e}")
-        return []
-
-def fetch_adzuna() -> list:
-    if not ADZUNA_APP_ID or not ADZUNA_API_KEY:
-        return []
-    results = []
-    for q in ["technical support", "saas support"]:
-        try:
-            resp = requests.get(
-                f"https://api.adzuna.com/v1/api/jobs/us/search/1",
-                params={"app_id": ADZUNA_APP_ID, "app_key": ADZUNA_API_KEY,
-                        "what": q, "what_or": "remote", "max_days_old": 7,
-                        "results_per_page": 15, "content-type": "application/json"},
-                timeout=15,
-            )
-            resp.raise_for_status()
-            for j in resp.json().get("results", []):
-                results.append({
-                    "id":           f"adzuna_{j.get('id', '')}",
-                    "title":        j.get("title", ""),
-                    "company":      (j.get("company") or {}).get("display_name", ""),
-                    "description":  j.get("description", ""),
-                    "salary":       f"${int(float(j['salary_min'])):,}-${int(float(j.get('salary_max') or j.get('salary_min'))):,}/yr" if j.get("salary_min") else "",
-                    "remote":       True,
-                    "url":          j.get("redirect_url", ""),
-                    "source":       "Adzuna",
-                    "source_emoji": "🟡",
-                    "posted_at":    (j.get("created") or "")[:10],
-                    "location":     j.get("location", {}).get("display_name", "Remote"),
-                })
-        except Exception as e:
-            log.error(f"Adzuna error ({q}): {e}")
-        time.sleep(1)
-    log.info(f"Adzuna -> {len(results)} jobs")
-    return results
-
-def fetch_findwork() -> list:
-    SUPPORT_TERMS = ["support", "saas", "api", "tier 2", "troubleshoot", "customer service"]
-    try:
-        resp = requests.get(
-            "https://findwork.dev/api/jobs/",
-            params={"search": "support", "remote": "true", "order_by": "-date_posted"},
-            headers={"User-Agent": "Mozilla/5.0 (compatible; SEOJobBot/5.0)"},
-            timeout=15,
-        )
-        if resp.status_code == 403:
-            log.warning("FindWork.dev: access denied")
-            return []
-        resp.raise_for_status()
-        results = []
-        for j in resp.json().get("results", []):
-            title = (j.get("role") or "").lower()
-            desc  = (j.get("text") or "").lower()[:500]
-            if not any(t in title or t in desc for t in SUPPORT_TERMS):
-                continue
-            results.append({
-                "id":           f"findwork_{j.get('id', '')}",
-                "title":        j.get("role", ""),
-                "company":      j.get("company_name", ""),
-                "description":  j.get("text", ""),
-                "salary":       "",
-                "remote":       j.get("remote", True),
-                "url":          j.get("url", ""),
-                "source":       "FindWork",
-                "source_emoji": "🟣",
-                "posted_at":    (j.get("date_posted") or "")[:10],
-                "location":     j.get("location") or "Remote",
-            })
-        log.info(f"FindWork -> {len(results)} jobs")
-        return results
-    except Exception as e:
-        log.error(f"FindWork error: {e}")
-        return []
-
-def fetch_cloudflare_worker() -> list:
-    if not CF_WORKER_URL:
-        return []
-    worker_url = CF_WORKER_URL.rstrip("/")
-    if not worker_url.endswith("/jobs"):
-        worker_url += "/jobs"
-    try:
-        resp = requests.get(worker_url, headers={"User-Agent": "SEOJobBot/5.0"}, timeout=20)
-        if resp.status_code in (401, 404):
-            log.error(f"CF Worker: {resp.status_code}")
-            return []
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") != "ok":
-            return []
-        jobs = []
-        for j in data.get("jobs", []):
-            if not j.get("id") or not j.get("title"):
-                continue
-            jobs.append({
-                "id":           str(j.get("id", "")),
-                "title":        j.get("title", ""),
-                "company":      j.get("company", ""),
-                "description":  j.get("description", ""),
-                "salary":       j.get("salary", ""),
-                "remote":       j.get("remote", True),
-                "url":          j.get("url", ""),
-                "source":       j.get("source", "CF Worker"),
-                "source_emoji": j.get("source_emoji", "☁️"),
-                "posted_at":    (j.get("posted_at") or "")[:10],
-                "location":     j.get("location", "Remote"),
-            })
-        log.info(f"CF Worker -> {len(jobs)} jobs")
-        return jobs
-    except Exception as e:
-        log.error(f"CF Worker error: {e}")
-        return []
-
-# ── JSearch API (اختیاری) ───────────────────────────────────────────────────
+# ── JSearch API (موتور اصلی استخراج لینکدین و ایندید) ───────────────────────
 
 def _should_run_p3() -> bool:
     return datetime.now(timezone.utc).day % 2 == 0
 
 def search_jsearch(query: str) -> list:
     if not RAPIDAPI_KEY:
+        log.error("RAPIDAPI_KEY is missing! JSearch requires an API key.")
         return []
+        
     url = "https://jsearch.p.rapidapi.com/search"
     headers = {"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": "jsearch.p.rapidapi.com"}
     params = {"query": query, "num_pages": "1", "date_posted": "week", "work_from_home": "true"}
@@ -490,7 +255,7 @@ def search_jsearch(query: str) -> list:
                 time.sleep(60)
                 continue
             if resp.status_code == 403:
-                log.error("JSearch 403")
+                log.error("JSearch 403 - Invalid or expired API Key.")
                 return []
             resp.raise_for_status()
             data = resp.json()
@@ -704,24 +469,11 @@ def main() -> None:
     raw_jobs = []
     source_counts = {}
 
-    # ── منابع رایگان ─────────────────────────────────────────────────────────
-    for fn, name in [
-        (fetch_remotive, "Remotive"),
-        (fetch_jobicy, "Jobicy"),
-        (fetch_arbeitnow, "Arbeitnow"),
-        (fetch_adzuna, "Adzuna"),
-        (fetch_findwork, "FindWork"),
-        (fetch_cloudflare_worker, "CF Worker"),
-    ]:
-        try:
-            jobs = fn()
-            source_counts[name] = len(jobs)
-            raw_jobs.extend(jobs)
-        except Exception as e:
-            log.error(f"{name} failed: {e}\n{traceback.format_exc()}")
-            source_counts[name] = 0
+    # ── منابع رایگان به دلیل کیفیت پایین و آگهی‌های تبلیغاتی حذف شدند ────────
+    # اکنون فقط JSearch اجرا می‌شود که مستقیماً از LinkedIn، Indeed، Glassdoor 
+    # و سیستم‌های استخدامی معتبر (ATS) آگهی‌ها را جمع‌آوری می‌کند.
 
-    # ── JSearch (اختیاری) ────────────────────────────────────────────────────
+    # ── JSearch (موتور اصلی) ─────────────────────────────────────────────────
     jsearch_total = 0
     for priority in sorted(JSEARCH_QUERIES.keys()):
         if priority == 3 and not _should_run_p3():
