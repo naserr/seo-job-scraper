@@ -1,5 +1,5 @@
 """
-SEO Job Scraper Bot v5.0
+SEO Job Scraper Bot v5.0 (Customized for Technical/SaaS Support)
 ========================
 منابع رایگان:
   • Remotive.com
@@ -87,37 +87,71 @@ MAX_JOBS_PER_RUN = 20
 MIN_FIT_SCORE    = 35
 MAX_JOB_AGE_DAYS = 7
 
+# ─── کلمات جستجو (سفارشی شده برای پشتیبانی فنی) ─────────────────────────────
 JSEARCH_QUERIES = {
-    1: ["Junior SEO remote", "Technical SEO remote", "SEO Python remote"],
-    2: ["SEO Content Editor remote", "WordPress SEO Specialist remote"],
-    3: ["on-page SEO specialist remote", "SEO copywriter remote"],
+    1: [
+        "Technical Support Specialist remote", 
+        "Customer Support Advocate remote", 
+        "SaaS Support remote"
+    ],
+    2: [
+        "Tier 2 Support remote", 
+        "Application Support remote", 
+        "API Support remote"
+    ],
+    3: [
+        "Integration Support remote", 
+        "Technical Support Engineer remote",
+        "Technical Support Yerevan",
+        "SaaS Support Yerevan"
+    ],
 }
 
+# ─── کلمات ضروری (Whitelist) ────────────────────────────────────────────────
+# حتما باید یکی از این کلمات در متن آگهی باشد تا ربات آن را تایید کند
+REQUIRED_KEYWORDS = [
+    "saas", "api", "n8n", "crm", "zendesk", "b2b", "tier 2", "tier ii", 
+    "tier-2", "escalation", "software support", "jira", "helpdesk"
+]
+
 _DEFAULT_SKILLS = [
-    "python", "wordpress", "technical seo", "on-page seo",
-    "screaming frog", "ahrefs", "semrush", "google analytics",
-    "google search console", "content", "keyword research",
-    "html", "cms", "link building", "schema",
+    "saas", "api integration", "tier 2", "n8n", "workflow automation",
+    "zendesk", "crm", "b2b", "troubleshooting", "html", "sql", "root cause analysis"
 ]
 _user_skills_env = os.environ.get("USER_SKILLS", "")
 MY_SKILLS = [s.strip().lower() for s in _user_skills_env.split(",") if s.strip()] if _user_skills_env else _DEFAULT_SKILLS
 
+# ─── کلمات ممنوعه (سفارشی شده برای جلوگیری از آگهی‌های نامرتبط و ویزا) ────────
 BLACKLIST_KEYWORDS = [
-    "us residents only", "must reside in us", "must be located in us",
-    "must be based in the us", "must be based in us",
-    "must be authorized to work in the us",
-    "senior seo", "head of seo", "director of seo", "vp of",
-    "agency", "full stack", "fullstack",
-    "native english speaker only",
-    "10+ years", "8+ years", "7+ years",
+    # محدودیت‌های ویزا و لوکیشن
+    "us residents only", "must reside in us", "must be located in the us",
+    "must be located in us", "us only", "uk residents only", "must reside in uk",
+    "eu only", "must be based in", "security clearance", "us citizen",
+    "green card", "no visa sponsorship",
+    
+    # مشاغل غیرمرتبط
+    "director", "manager", "head of", "vice president", "vp", 
+    "software engineer", "internship", "unpaid", "volunteer", 
+    "commission only", "cold calling", "outbound sales", "full stack", 
+    "fullstack", "construction", "hvac", "electrical" # برای جلوگیری از آگهی‌های مشابه SOLV Energy
 ]
 
+# ─── کلمات امتیازآور (سفارشی شده) ───────────────────────────────────────────
 BOOST_KEYWORDS = {
-    "technical seo": 20, "python": 18, "wordpress": 15,
-    "junior": 18, "entry level": 15, "associate": 12,
-    "seo specialist": 12, "seo editor": 12, "content editor": 10,
-    "on-page": 10, "part-time": 8, "contract": 5,
-    "remote-first": 8, "async": 5, "flexible": 4,
+    "saas": 20,
+    "api": 20,
+    "tier 2": 15,
+    "tier ii": 15,
+    "b2b": 15,
+    "n8n": 25,
+    "workflow": 15,
+    "integration": 15,
+    "zendesk": 15,
+    "jira": 10,
+    "troubleshooting": 15,
+    "yerevan": 20,
+    "armenia": 20,
+    "remote-first": 10,
 }
 
 _SKILL_PATTERNS   = {s: re.compile(r"\b" + re.escape(s) + r"\b", re.I) for s in MY_SKILLS}
@@ -142,7 +176,14 @@ def load_prompt_template() -> str:
                     return content
     except Exception as e:
         log.warning(f"Could not load prompt.txt: {e}")
-    return "Write a short, professional cover letter for the '{title}' position at '{company}'. Focus on my technical SEO skills. Job link: {url}"
+    
+    # پرامپت پیش‌فرض کاور لتر برای پشتیبانی فنی
+    return (
+        "Write a highly professional and concise cover letter for the '{title}' position at '{company}'.\n\n"
+        "Focus strongly on my experience as a Technical Support Specialist (Tier 2), my expertise in SaaS troubleshooting, API integrations, and workflow automation (especially n8n). Emphasize my ability to resolve complex bugs, replicate issues in sandbox environments, and communicate effectively with engineering teams.\n\n"
+        "Job link: {url}\n\n"
+        "Keep it under 200 words, make it highly tailored to the job requirements, use a confident but empathetic tone, and end with a strong call to action for an interview. Do not use generic placeholders."
+    )
 
 # ── Seen Jobs Cache ─────────────────────────────────────────────────────────
 
@@ -182,13 +223,16 @@ def calculate_fit_score(job: dict) -> tuple:
             matched_skills.append(skill)
             score += 7
 
-    if re.search(r"\bseo\b", title):
+    # امتیاز ویژه برای وجود کلمه support در عنوان
+    if re.search(r"\bsupport\b", title):
         score += 12
     if job.get("salary"):
         score += 10
     if job.get("remote"):
         score += 8
-    if any(re.search(r"\b" + w + r"\b", title) for w in ["junior", "associate", "entry", "jr"]):
+    
+    # در آگهی‌های پشتیبانی، این کلمات معمولا نشانه سطح مناسب هستند
+    if any(re.search(r"\b" + w + r"\b", title) for w in ["specialist", "advocate", "engineer"]):
         score += 10
 
     return min(score, 100), matched_skills[:4]
@@ -197,9 +241,9 @@ def calculate_fit_score(job: dict) -> tuple:
 
 def fetch_remotive() -> list:
     endpoints = [
-        "https://remotive.com/api/remote-jobs?category=seo&limit=20",
-        "https://remotive.com/api/remote-jobs?search=technical+seo&limit=10",
-        "https://remotive.com/api/remote-jobs?search=seo+content&limit=10",
+        "https://remotive.com/api/remote-jobs?category=customer_support&limit=20",
+        "https://remotive.com/api/remote-jobs?search=technical+support&limit=10",
+        "https://remotive.com/api/remote-jobs?search=saas+support&limit=10",
     ]
     results = []
     for url in endpoints:
@@ -228,9 +272,8 @@ def fetch_remotive() -> list:
 
 def fetch_jobicy() -> list:
     endpoints = [
-        "https://jobicy.com/api/v2/remote-jobs?tag=seo&count=20",
-        "https://jobicy.com/api/v2/remote-jobs?tag=content-marketing&count=15",
-        "https://jobicy.com/api/v2/remote-jobs?tag=wordpress&count=10",
+        "https://jobicy.com/api/v2/remote-jobs?tag=customer-support&count=20",
+        "https://jobicy.com/api/v2/remote-jobs?tag=technical-support&count=15",
     ]
     results = []
     for url in endpoints:
@@ -262,7 +305,7 @@ def fetch_jobicy() -> list:
     return results
 
 def fetch_arbeitnow() -> list:
-    SEO_TERMS = ["seo", "search engine optimization", "content editor", "technical seo", "wordpress seo"]
+    SUPPORT_TERMS = ["support", "saas", "technical support", "customer advocate", "api"]
     try:
         resp = requests.get("https://arbeitnow.com/api/job-board-api", timeout=15, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
@@ -272,7 +315,7 @@ def fetch_arbeitnow() -> list:
                 continue
             title = (j.get("title") or "").lower()
             desc  = (j.get("description") or "").lower()[:300]
-            if not any(t in title or t in desc for t in SEO_TERMS):
+            if not any(t in title or t in desc for t in SUPPORT_TERMS):
                 continue
             results.append({
                 "id":           f"arbeitnow_{j.get('slug', '')}",
@@ -297,7 +340,7 @@ def fetch_adzuna() -> list:
     if not ADZUNA_APP_ID or not ADZUNA_API_KEY:
         return []
     results = []
-    for q in ["seo", "technical seo", "seo specialist"]:
+    for q in ["technical support", "saas support"]:
         try:
             resp = requests.get(
                 f"https://api.adzuna.com/v1/api/jobs/us/search/1",
@@ -328,11 +371,11 @@ def fetch_adzuna() -> list:
     return results
 
 def fetch_findwork() -> list:
-    SEO_TERMS = ["seo", "search engine", "content editor", "wordpress", "technical seo", "organic", "keyword"]
+    SUPPORT_TERMS = ["support", "saas", "api", "tier 2", "troubleshoot", "customer service"]
     try:
         resp = requests.get(
             "https://findwork.dev/api/jobs/",
-            params={"search": "seo", "remote": "true", "order_by": "-date_posted"},
+            params={"search": "support", "remote": "true", "order_by": "-date_posted"},
             headers={"User-Agent": "Mozilla/5.0 (compatible; SEOJobBot/5.0)"},
             timeout=15,
         )
@@ -344,7 +387,7 @@ def fetch_findwork() -> list:
         for j in resp.json().get("results", []):
             title = (j.get("role") or "").lower()
             desc  = (j.get("text") or "").lower()[:500]
-            if not any(t in title or t in desc for t in SEO_TERMS):
+            if not any(t in title or t in desc for t in SUPPORT_TERMS):
                 continue
             results.append({
                 "id":           f"findwork_{j.get('id', '')}",
@@ -467,12 +510,28 @@ def _normalize_jsearch(j: dict) -> dict:
 
 # ── Filters ─────────────────────────────────────────────────────────────────
 
-def is_blacklisted(job: dict) -> tuple:
-    text = f"{(job.get('title') or '').lower()} {(job.get('description') or '')[:2000].lower()}"
+def is_valid_job(job: dict) -> tuple:
+    """بررسی می‌کند که آیا آگهی شرایط ضروری (Whitelist) را دارد و در Blacklist نیست"""
+    description = (job.get("description") or "").lower()
+    title       = (job.get("title") or "").lower()
+    combined    = f"{title} {description}"
+
+    # 1. بررسی Blacklist (رد کردن در صورت وجود)
     for kw, pattern in _BLACKLIST_PATTERNS.items():
-        if pattern.search(text):
-            return True, kw
-    return False, ""
+        if pattern.search(combined):
+            return False, f"Blacklisted: {kw}"
+            
+    # 2. بررسی Whitelist (الزامی بودن حداقل یکی از کلمات کلیدی IT/SaaS)
+    has_required = False
+    for req_kw in REQUIRED_KEYWORDS:
+        if re.search(r"\b" + re.escape(req_kw) + r"\b", combined):
+            has_required = True
+            break
+            
+    if not has_required:
+        return False, "Missing IT/SaaS context"
+
+    return True, ""
 
 def is_too_old(job: dict) -> bool:
     posted = (job.get("posted_at") or "")[:10]
@@ -612,7 +671,7 @@ def batch_append_to_sheet(client, rows: list) -> None:
 
 def main() -> None:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    log.info(f"=== SEO Job Scraper v5.0 started at {now} ===")
+    log.info(f"=== SaaS Support Job Scraper v5.0 started at {now} ===")
 
     seen_jobs = load_seen_jobs()
     sheets = get_sheets_client()
@@ -657,7 +716,7 @@ def main() -> None:
     # ── فیلتر + امتیازدهی ────────────────────────────────────────────────────
     seen_ids = set()
     title_keys = set()
-    stats = {"blacklisted": 0, "seen": 0, "old": 0, "low_score": 0}
+    stats = {"filtered_out": 0, "seen": 0, "old": 0, "low_score": 0}
     qualified = []
 
     for job in raw_jobs:
@@ -680,9 +739,11 @@ def main() -> None:
             seen_jobs[jid] = True
             title_keys.add(title_key)
 
-            bl, _ = is_blacklisted(job)
-            if bl:
-                stats["blacklisted"] += 1
+            # استفاده از فیلتر ترکیبی (Blacklist + Whitelist)
+            is_valid, reason = is_valid_job(job)
+            if not is_valid:
+                log.info(f"Filtered {job.get('title')}: {reason}")
+                stats["filtered_out"] += 1
                 continue
 
             if is_too_old(job):
@@ -701,7 +762,7 @@ def main() -> None:
     qualified.sort(key=lambda x: x[1], reverse=True)
 
     log.info(
-        f"Qualified: {len(qualified)} | BL: {stats['blacklisted']} | "
+        f"Qualified: {len(qualified)} | Filtered: {stats['filtered_out']} | "
         f"Seen: {stats['seen']} | Old: {stats['old']} | Low: {stats['low_score']}"
     )
 
@@ -714,7 +775,7 @@ def main() -> None:
             f"🔍 <b>Daily Report</b>\n📅 {now}\n\n"
             f"No qualified jobs found.\n\n"
             f"📌 {sources_line or 'No sources'}\n"
-            f"⛔ {stats['blacklisted']} filtered | "
+            f"⛔ {stats['filtered_out']} filtered | "
             f"📉 {stats['low_score']} low score | "
             f"🔁 {stats['seen']} duplicates | "
             f"🕐 {stats['old']} old"
@@ -723,10 +784,10 @@ def main() -> None:
         return
 
     send_telegram(
-        f"🤖 <b>New SEO Jobs</b>\n"
+        f"🤖 <b>New Support Jobs</b>\n"
         f"📅 {now}\n\n"
         f"✅ <b>{len(qualified)}</b> jobs (sorted by fit)\n"
-        f"⛔ {stats['blacklisted']} filtered | "
+        f"⛔ {stats['filtered_out']} filtered | "
         f"📉 {stats['low_score']} low | "
         f"🔁 {stats['seen']} dupes\n\n"
         f"📌 {sources_line}\n"
