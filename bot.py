@@ -1,9 +1,10 @@
 """
-SEO Job Scraper Bot v6.0 (Ultimate B2B & Tech Support Sniper)
+SEO Job Scraper Bot v7.0 (Strict Global Remote Sniper)
 ========================
 این نسخه فقط از JSearch (LinkedIn, Indeed, Glassdoor) استفاده می‌کند.
 تمامی منابع رایگان و اسپم به دلیل کیفیت پایین حذف شده‌اند.
-تمرکز استراتژی بر روی مشاغل ریموت بین‌المللی با قرارداد B2B/1099 است.
+تمرکز استراتژی بر روی مشاغل "حقیقتاً ریموت بین‌المللی" است.
+فیلترهای بسیار سخت‌گیرانه‌ای برای حذف مشاغل محدود به داخل آمریکا (Geofencing) اعمال شده است.
 """
 
 import html
@@ -59,30 +60,39 @@ MAX_JOBS_PER_RUN = 20
 MIN_FIT_SCORE    = 35
 MAX_JOB_AGE_DAYS = 7
 
-# ─── کلمات جستجو (سفارشی شده برای پشتیبانی فنی بین‌المللی و B2B) ────────────
+# ─── کلمات جستجو (سفارشی شده برای فرار از مشاغل آمریکا) ────────────
+# استفاده مستقیم از کلمات کلیدی جهانی در قلب جستجوی گوگل/لینکدین
 JSEARCH_QUERIES = {
     1: [
-        "Technical Support Specialist remote contract", 
-        "Customer Support remote B2B", 
-        "SaaS Support remote 1099"
+        "Technical Support Specialist remote worldwide", 
+        "Customer Support remote anywhere", 
+        "SaaS Support remote global"
     ],
     2: [
-        "Tier 2 Support remote independent contractor", 
-        "Application Support remote contract", 
-        "API Support remote freelance"
+        "Tier 2 Support remote EMEA", 
+        "Application Support remote contractor", 
+        "API Support remote independent contractor"
     ],
     3: [
         "Technical Support Yerevan",
-        "SaaS Support Yerevan contract"
+        "SaaS Support Yerevan"
     ],
 }
 
 # ─── کلمات ضروری (Whitelist) ────────────────────────────────────────────────
 # حتما باید حداقل یکی از این کلمات در متن آگهی باشد تا ربات آن را تایید کند
 REQUIRED_KEYWORDS = [
-    "saas", "api", "n8n", "crm", "zendesk", "b2b", "tier 1", "tier 2", 
+    "saas", "api", "n8n", "crm", "zendesk", "tier 1", "tier 2", 
     "tier i", "tier ii", "jira", "helpdesk", "freshdesk", "intercom", 
     "servicenow", "troubleshooting", "bug reporting", "root cause"
+]
+
+# ─── کلمات ضروری بین‌المللی (Global Whitelist) ────────────────────────────────
+# آگهی باید حتماً یکی از این کلمات را داشته باشد تا نشان دهد مختص آمریکا نیست
+GLOBAL_REQUIRED_KEYWORDS = [
+    "worldwide", "anywhere", "global", "emea", "contractor", "b2b", 
+    "1099", "independent contractor", "yerevan", "armenia", "offshore",
+    "distributed team", "remote-first"
 ]
 
 _DEFAULT_SKILLS = [
@@ -92,62 +102,59 @@ _DEFAULT_SKILLS = [
 _user_skills_env = os.environ.get("USER_SKILLS", "")
 MY_SKILLS = [s.strip().lower() for s in _user_skills_env.split(",") if s.strip()] if _user_skills_env else _DEFAULT_SKILLS
 
-# ─── کلمات ممنوعه (لیست سیاه دقیق شما) ────────────────────────────────────────
+# ─── کلمات ممنوعه (لیست سیاه بسیار سخت‌گیرانه علیه محدودیت‌های آمریکا) ──────────
 BLACKLIST_KEYWORDS = [
-    # وضعیت استخدام و مالیات (ویژه آمریکا)
-    "w-2", "w2", "401(k)", "401k", "health insurance", "dental insurance", 
-    "vision insurance", "medical, dental", "dental, vision",
+    # محدودیت‌های جغرافیایی دقیق (آمریکا و اروپا)
+    "united states only", "us only", "must reside in the us", "must reside in us", 
+    "must live in the us", "must be based in the us", "must be based in us",
+    "us work authorization", "authorized to work in the us", "us citizen", 
+    "us citizens", "green card", "no visa sponsorship", "must be a us resident",
+    "must be located in the us", "must be located in us", "security clearance", 
+    "public trust", "uk residents only", "eu only",
     
-    # محدودیت‌های جغرافیایی
-    "united states only", "us only", "must reside in", "us citizen", 
-    "security clearance", "public trust", "must be based in", 
-    "green card", "no visa sponsorship",
+    # وضعیت استخدام و مالیات داخلی آمریکا
+    "w-2", "w2", "401(k)", "401k", "health insurance", "dental insurance", 
+    "vision insurance", "medical, dental", "dental, vision", "federal contractor",
     
     # تخصص‌های غیرمرتبط شبکه و زیرساخت فیزیکی
     "noc", "msp", "high voltage", "ccna", "hardware", "physical server", 
     "construction", "hvac", "electrical",
     
-    # حوزه‌های مالی، بانکی و دولتی آمریکا
-    "accounting", "ach payments", "gaap", "federal contractor", "mortgage",
+    # حوزه‌های مالی و بانکی داخلی آمریکا
+    "accounting", "ach payments", "gaap", "mortgage",
     
-    # عناوین شغلی ارشد و مدیریتی (جلوگیری از Overqualified)
-    "manager", "director", "head of", "founder", "growth marketing", "vp", "vice president",
-    "internship", "unpaid", "volunteer", "commission only"
+    # عناوین شغلی ارشد و نامربوط
+    "manager", "director", "head of", "founder", "growth marketing", "vp", 
+    "vice president", "internship", "unpaid", "volunteer", "commission only"
 ]
 
 # ─── کلمات امتیازآور (جهش آگهی‌های منطبق به صدر لیست) ────────────────────────
 BOOST_KEYWORDS = {
-    # نوع قرارداد بین‌المللی (بسیار مهم برای شما)
-    "independent contractor": 25,
-    "b2b": 25,
-    "1099": 25,
+    # نوع قرارداد بین‌المللی و لوکیشن
+    "independent contractor": 30,
+    "b2b": 30,
+    "1099": 30,
+    "worldwide": 25,
+    "anywhere in the world": 25,
+    "emea": 25,
+    "global remote": 20,
     "offshore": 20,
-    "remote (worldwide)": 20,
-    "remote (anywhere)": 20,
-    "international benefits": 15,
-    "distributed team": 15,
-    "contract": 15,
+    "yerevan": 30,
     
-    # تخصص‌های فنی و نرم‌افزارها
+    # تخصص‌های فنی
     "saas": 15,
     "api": 15,
     "n8n": 25,
     "zendesk": 15,
     "jira": 10,
-    "freshdesk": 10,
-    "servicenow": 10,
     "tier 2": 15,
-    "tier 1": 10,
-    "pipedrive": 10,
+    "troubleshooting": 10,
     
-    # ساعات کاری منطبق
-    "us business hours": 10,
+    # ساعات کاری
     "est": 5,
     "cst": 5,
     "weekend shift": 10,
-    "weekend shifts": 10,
-    "after-hours": 10,
-    "yerevan": 20
+    "after-hours": 10
 }
 
 _SKILL_PATTERNS   = {s: re.compile(r"\b" + re.escape(s) + r"\b", re.I) for s in MY_SKILLS}
@@ -159,10 +166,8 @@ _BLACKLIST_PATTERNS = {kw: re.compile(r"\b" + re.escape(kw.lower()) + r"\b", re.
 CL_PROMPT_TEMPLATE = os.environ.get("CL_PROMPT", "")
 
 def load_prompt_template() -> str:
-    # اول از متغیر محیطی CL_PROMPT بخون
     if CL_PROMPT_TEMPLATE:
         return CL_PROMPT_TEMPLATE.strip()
-    # اگه نیست، از فایل prompt.txt بخون
     try:
         prompt_file = SCRIPT_DIR / "prompt.txt"
         if prompt_file.exists():
@@ -173,7 +178,6 @@ def load_prompt_template() -> str:
     except Exception as e:
         log.warning(f"Could not load prompt.txt: {e}")
     
-    # پرامپت پیش‌فرض کاور لتر برای پشتیبانی فنی
     return (
         "Write a highly professional and concise cover letter for the '{title}' position at '{company}'.\n\n"
         "Focus strongly on my experience as a Technical Support Specialist (Tier 2), my expertise in SaaS troubleshooting, API integrations, and workflow automation (especially n8n). Emphasize my ability to resolve complex bugs, replicate issues in sandbox environments, and communicate effectively with engineering teams.\n\n"
@@ -219,7 +223,6 @@ def calculate_fit_score(job: dict) -> tuple:
             matched_skills.append(skill)
             score += 7
 
-    # امتیاز ویژه برای وجود کلمه support در عنوان
     if re.search(r"\bsupport\b", title):
         score += 12
     if job.get("salary"):
@@ -227,8 +230,7 @@ def calculate_fit_score(job: dict) -> tuple:
     if job.get("remote"):
         score += 8
     
-    # در آگهی‌های پشتیبانی، این کلمات معمولا نشانه سطح مناسب هستند
-    if any(re.search(r"\b" + w + r"\b", title) for w in ["specialist", "advocate", "engineer"]):
+    if any(re.search(r"\b" + w + r"\b", title) for w in ["specialist", "advocate", "engineer", "tier 2", "tier ii"]):
         score += 10
 
     return min(score, 100), matched_skills[:4]
@@ -300,25 +302,35 @@ def _normalize_jsearch(j: dict) -> dict:
 # ── Filters ─────────────────────────────────────────────────────────────────
 
 def is_valid_job(job: dict) -> tuple:
-    """بررسی می‌کند که آیا آگهی شرایط ضروری (Whitelist) را دارد و در Blacklist نیست"""
+    """بررسی می‌کند که آیا آگهی شرایط ضروری را دارد و در لیست سیاه نیست."""
     description = (job.get("description") or "").lower()
     title       = (job.get("title") or "").lower()
     combined    = f"{title} {description}"
 
-    # 1. بررسی Blacklist (رد کردن در صورت وجود)
+    # 1. بررسی Blacklist (رد کردن بی‌رحمانه آگهی‌های محدود به آمریکا)
     for kw, pattern in _BLACKLIST_PATTERNS.items():
         if pattern.search(combined):
-            return False, f"Blacklisted: {kw}"
+            return False, f"Blacklisted (US/Visa restriction): {kw}"
             
-    # 2. بررسی Whitelist (الزامی بودن حداقل یکی از کلمات کلیدی IT/SaaS)
-    has_required = False
+    # 2. بررسی Whitelist فنی (باید حتما مرتبط با IT/SaaS باشد)
+    has_tech_required = False
     for req_kw in REQUIRED_KEYWORDS:
         if re.search(r"\b" + re.escape(req_kw) + r"\b", combined):
-            has_required = True
+            has_tech_required = True
             break
             
-    if not has_required:
-        return False, "Missing IT/SaaS context"
+    if not has_tech_required:
+        return False, "Missing IT/SaaS technical keywords"
+
+    # 3. بررسی Whitelist بین‌المللی (باید نشانه‌ای از کار جهانی یا قرارداد داشته باشد)
+    has_global_required = False
+    for req_kw in GLOBAL_REQUIRED_KEYWORDS:
+        if re.search(r"\b" + re.escape(req_kw) + r"\b", combined):
+            has_global_required = True
+            break
+            
+    if not has_global_required:
+        return False, "Missing Global/Contractor keywords (Likely US-only disguised as remote)"
 
     return True, ""
 
@@ -364,7 +376,6 @@ def format_job(job: dict, score: int, skills: list) -> str:
     return "\n".join(lines)
 
 def build_job_buttons(job: dict) -> dict:
-    """ساخت دکمه‌ها: Apply + ChatGPT Cover Letter"""
     url = job.get("url", "")
     if not url:
         return {}
@@ -460,7 +471,7 @@ def batch_append_to_sheet(client, rows: list) -> None:
 
 def main() -> None:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    log.info(f"=== SaaS Support Job Scraper v5.0 started at {now} ===")
+    log.info(f"=== SaaS Support Job Scraper v7.0 started at {now} ===")
 
     seen_jobs = load_seen_jobs()
     sheets = get_sheets_client()
@@ -468,10 +479,6 @@ def main() -> None:
 
     raw_jobs = []
     source_counts = {}
-
-    # ── منابع رایگان به دلیل کیفیت پایین و آگهی‌های تبلیغاتی حذف شدند ────────
-    # اکنون فقط JSearch اجرا می‌شود که مستقیماً از LinkedIn، Indeed، Glassdoor 
-    # و سیستم‌های استخدامی معتبر (ATS) آگهی‌ها را جمع‌آوری می‌کند.
 
     # ── JSearch (موتور اصلی) ─────────────────────────────────────────────────
     jsearch_total = 0
@@ -515,7 +522,7 @@ def main() -> None:
             seen_jobs[jid] = True
             title_keys.add(title_key)
 
-            # استفاده از فیلتر ترکیبی (Blacklist + Whitelist)
+            # استفاده از فیلتر ترکیبی (Blacklist + Whitelist دوگانه)
             is_valid, reason = is_valid_job(job)
             if not is_valid:
                 log.info(f"Filtered {job.get('title')}: {reason}")
